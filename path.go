@@ -45,7 +45,7 @@ type Arc struct {
 func (a Arc) segment_tag() {}
 
 func ParsePath(s string) (segs []Segment, err error) {
-	p := &PathParser{s: s}
+	p := &PathParser{s: s, orig: s}
 	for {
 		seg, err := p.Next()
 		if err != nil {
@@ -65,7 +65,45 @@ type PathParser struct {
 	n int       // the number of float arguments cmd requires
 	pt Point    // current position (used for relative coordinates)
 	start Point // start of current subpath
+	orig string // original string (for errors)
 	prev Segment
+}
+
+type ParseError struct {
+	Full string // the [entire] string which failed parsing
+	Index int   // the index at which parsing failed
+	Msg string  // error details
+}
+
+func (e ParseError) Context(chars int) string {
+	start, end := e.Index - chars, e.Index + chars
+	m := ""
+	if start < 0 {
+		m += e.Full[:e.Index]
+	} else {
+		m += "…" + e.Full[start:e.Index]
+	}
+	m += "¡" + e.Full[e.Index:e.Index+1] + "!"
+	if e.Index < len(e.Full) - 1 {
+		if end > len(e.Full) - 1 {
+			m += e.Full[e.Index+1:]
+		} else {
+			m += e.Full[e.Index+1:end] + "…"
+		}
+	}
+	return m
+}
+
+func (e ParseError) Error() string {
+	m := "parse error at index " + strconv.Itoa(e.Index) + ": " + e.Context(20)
+	if e.Msg != "" {
+		m += ": " + e.Msg
+	}
+	return m
+}
+
+func (p PathParser) error(msg string) ParseError {
+	return ParseError{p.orig, strings.LastIndex(p.orig, p.s), msg}
 }
 
 func (p *PathParser) Next() (seg Segment, err error) {
@@ -107,10 +145,13 @@ func (p *PathParser) Next() (seg Segment, err error) {
 			offset = 1
 		}
 		endpos := offset + strings.IndexFunc(p.s[offset:], func(r rune)bool { return !strings.ContainsRune("0123456789.", r) })
+		if endpos < offset {
+			endpos = len(p.s)
+		}
 		num, p.s = p.s[:endpos], p.s[endpos:]
 		f, err := strconv.ParseFloat(num, 64)
 		if err != nil {
-			return nil, err
+			return nil, p.error(err.Error())
 		}
 		args[i] = f
 	}

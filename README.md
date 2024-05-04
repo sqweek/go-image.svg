@@ -54,5 +54,6 @@ much as `import "image/png"` gives you a package referred to as `png`.
 2. XML not supported at all (yet)
 3. `svg.ParsePath` should probably accept a `Point` argument for when the first command in the path is relative (ie. not absolute)
 4. There should be a way to render a path to an existing `Image` rather than always allocating a new one
+5. It should be possible to programatically build a path without parsing a string
 
 
